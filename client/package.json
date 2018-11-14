@@ -1,0 +1,17 @@
+{
+  "scripts": {
+    "start": "parcel index.pug --open"
+  },
+  "devDependencies": {
+    "@types/pixi.js": "^4.8.0",
+    "@types/socket.io": "^1.4.38",
+    "@types/socket.io-client": "^1.4.32",
+    "node-sass": "^4.9.3",
+    "parcel-bundler": "^1.9.7",
+    "pixi.js": "^4.8.1",
+    "pug": "^2.0.3",
+    "socket.io": "^2.1.1",
+    "socket.io-client": "^2.1.1",
+    "typescript": "^3.0.3"
+  }
+}
