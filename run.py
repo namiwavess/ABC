@@ -8,7 +8,7 @@ def spawn(d, name, ws):
 
 ws = "ws://localhost:3000/ws"
 
-amebas = [("Volvox", "Volvox")]
+amebas = [("Manned", "Manned"),("Original", "Original"),("Volvox", "Volvox2"),("Volvox", "Volvox3"),("Volvox", "Volvox4"),("Volvox", "Volvox5"),("Volvox", "Volvox6"),("Volvox", "Volvox7"),("Volvox", "Volvox8"),("Volvox", "Volvox9")]
 
 n = int(sys.argv[1]) - len(amebas)
 

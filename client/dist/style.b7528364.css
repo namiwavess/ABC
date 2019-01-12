@@ -1,2 +1,32 @@
-body {
-  padding: 10px; }
+#gamelog {
+  width: 1000px;
+  height: 150px;
+  border: 6px double #333333;
+  background-color: #ffffbb;
+  color: #000000;
+  overflow: auto;
+}
+
+.result {
+  width: 1000px;
+  height: 1000px;
+  z-index: 1;
+  background-color: rgba(0,0,0,0.1);
+  position: absolute;
+}
+
+#killbox {
+  width: 13%;
+  height: 7%;
+  z-index: 2;
+  background-color: rgba(0,0,0,0.1);
+  position: fixed;
+  top: 5%;
+  left: 85%; 
+}
+
+p#info {
+  margin: 0px;
+  color: rgba(0,0,255,0.5);
+  font-size: 2vw;  
+}

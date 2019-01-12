@@ -54,11 +54,12 @@ class Cell:
 
 
   def on_error(self, ws, error):
-    print("debug: called on_error")
-    print(error)
+    #print("debug: called on_error")
+    #print(error)
+    pass
 
   def on_close(self, ws):
-    print("killed {}".format(self.number))
+    #print("killed {}".format(self.name))#," my name is {}".format(self.name))
     exit()
 
   def initXY(self):

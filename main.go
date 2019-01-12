@@ -30,8 +30,14 @@ const (
 var maxPlayers int
 var worldWidth int
 var worldHeight int
+var foodquantity int
+var cheat bool
+var mannedname string
 
 type Pos struct{ X, Y int }
+
+type Mouse struct{ X,Y int }
+var mouse Mouse
 
 type Player struct {
 	name    string
@@ -40,6 +46,7 @@ type Player struct {
 	session *melody.Session
 }
 
+// プレイヤー同士の衝突検出
 func detectCollison(p1 Pos, r1 float64, p2 Pos, r2 float64) bool {
 	dx := p1.X - p2.X
 	dy := p1.Y - p2.Y
@@ -109,6 +116,9 @@ func encodeData(diff map[int]Pos, players []Player) string {
 		}
 	}
 
+	fmt.Fprintf(result, " ")
+	fmt.Fprintf(result, "%d,%d",mouse.X,mouse.Y)
+
 	return result.String()
 }
 
@@ -122,6 +132,11 @@ func (p *Player) loss() {
 	p.mass = math.Max(p.mass, minPlayerSize)
 }
 
+var killflag bool = false
+var killlog string = ""
+var rank int = -1
+var killnum int = 0
+
 func update(id int, players []Player, food []Pos) {
 	pos, r := players[id].pos, players[id].mass
 
@@ -131,19 +146,45 @@ func update(id int, players []Player, food []Pos) {
 			players[id].eat(foodSize)
 		}
 	}
-
 	for i, u := range players {
+		if cheat && u.name == mannedname && u.mass < 200 {//チート
+			u.mass = 200
+		}
 		if u.pos.X != -1 && players[i] != players[id] && detectCollison(pos, r, u.pos, u.mass) {
+			var killmsg = new(bytes.Buffer)
+			survivor := 0
+			for j := 0; j < maxPlayers; j++ {
+				if players[j].pos.X != -1 {
+					survivor++
+				}
+			}
 			if r*(1+eatingRate) < u.mass {
 				players[i].eat(r)
 				players[id].pos.X = -1
 				players[id].session.Close()
-				fmt.Printf("%s is Dead\n", players[id].name)
+				if players[id].name == mannedname {
+					rank = survivor
+				}else if players[i].name == mannedname {
+					killnum++
+				}
+				fmt.Printf("%s is Dead killed by %s\n", players[id].name,players[i].name)
+				fmt.Fprintf(killmsg,"%s,is,Dead,killed,by,%s %d %d", players[id].name,players[i].name,killnum,survivor-1)
+				killflag = true
+				killlog = killmsg.String()
 			} else if u.mass*1.05 < r {
 				players[id].eat(u.mass)
 				players[i].pos.X = -1
 				players[i].session.Close()
-				fmt.Printf("%s is Dead\n", players[i].name)
+				if players[i].name == mannedname {
+					rank = survivor
+				}else if players[id].name == mannedname {
+					killnum++
+				}
+				fmt.Printf("%s is Dead killed by %s\n", players[i].name,players[id].name)
+				fmt.Fprintf(killmsg,"%s,is,Dead,killed,by,%s %d %d", players[i].name,players[id].name,killnum,survivor-1)
+				killflag = true
+				killlog = killmsg.String()
+				
 			}
 		}
 	}
@@ -178,28 +219,38 @@ type Act struct {
 	y int
 }
 
+var continueflag bool = true
+
 func main() {
 	flag.IntVar(&maxPlayers, "num", 100, "set maxPlayers")
-	flag.IntVar(&worldWidth, "w", 1000, "set maxPlayers")
-	flag.IntVar(&worldHeight, "h", 1000, "set maxPlayers")
+	flag.IntVar(&worldWidth, "w", 1000, "set worldWidth")
+	flag.IntVar(&worldHeight, "h", 1000, "set worldHeight")
+	flag.IntVar(&foodquantity, "food", 100, "set food quantity")
+	flag.BoolVar(&cheat, "c", false, "cheat mode always your size 200")
+	flag.StringVar(&mannedname, "name", "Manned", "Manned players name")
 	flag.Parse()
+
+	mouse.X = worldWidth/2
+	mouse.Y = worldHeight/2
 
 	players := make([]Player, maxPlayers)
 	queue := make(chan Act, maxPlayers)
 
-	food := generateFood(100, worldWidth, worldHeight)
+	food := generateFood(foodquantity, worldWidth, worldHeight)
 	addFood(food, worldWidth, worldHeight)
 	initFood := initFoodPos(food)
 
 	playerNum := 0
 	frame := 0
 
-	waitPlayers := sync.WaitGroup{}
+	waitPlayers := sync.WaitGroup{} 
+	//playerの同期
 	waitPlayers.Add(maxPlayers)
+	//同期するplayerの数
 	mu := sync.Mutex{}
 
-	ws := melody.New()
-	view := melody.New()
+	ws := melody.New() //playerとのwebsocket
+	view := melody.New() //webブラウザとのwebsocket
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		ws.HandleRequest(w, r)
@@ -213,6 +264,9 @@ func main() {
 
 	view.HandleConnect(func(s *melody.Session) {
 		result := new(bytes.Buffer)
+		setinfo := new(bytes.Buffer)
+		fmt.Fprintf(setinfo, "9 %d %d",0,maxPlayers)
+		view.Broadcast([]byte(setinfo.String()))
 		fmt.Fprintf(result, "4 ")
 
 		for i, f := range food {
@@ -248,6 +302,30 @@ func main() {
 
 	})
 
+	view.HandleMessage(func(s *melody.Session, msg []byte) {
+		cmd := strings.Fields(string(msg))
+
+		switch cmd[0] {
+		case "5": //マウスの座標受け取り
+			
+			mousex, _ := strconv.Atoi(cmd[1])
+			mousey, _ := strconv.Atoi(cmd[2])
+
+			mouse.X = mousex
+			mouse.Y = mousey
+
+		case "7": //Quit Button
+			for _ , p := range players {
+				p.session.Close()
+			}
+			os.Exit(0)
+
+		default:
+			fmt.Println("unexpected value js")
+		}
+	})
+
+	//クライアント(Cell.py)からメッセージを受信したときに行う処理
 	ws.HandleMessage(func(s *melody.Session, msg []byte) {
 		cmd := strings.Fields(string(msg))
 
@@ -280,6 +358,10 @@ func main() {
 		msg := encodeData(addFood(food, worldWidth, worldHeight), players)
 		ws.Broadcast([]byte("4 " + msg))
 		view.Broadcast([]byte("4 " + msg))
+		if(killflag){
+			view.Broadcast([]byte("6 " + killlog))
+			killflag = false
+		}
 	}
 
 	gameLoop := func() {
@@ -310,15 +392,35 @@ func main() {
 			}
 		}
 
-		if survivor == 1 {
+		if rank != -1 {
+			var losemsg = new(bytes.Buffer)
+			fmt.Fprintf(losemsg,"<br><h1>#,%d/%d<br></h1><h1,style=\"color:blue\">まあ、こんな日もあるのさ!次はもう少しツイてますように!</h1>", rank, maxPlayers)
+			fmt.Fprintf(losemsg,"<br><h2>ランク,#%d　　キル,%d,プレイヤー　　報酬　なし</h1>",rank,killnum)
+			view.Broadcast([]byte("8 " + losemsg.String()))
+			rank = -1		
+		}
+
+		if survivor == 1 && continueflag {
 			for _, u := range players {
 				if u.pos.X != -1 {
-					fmt.Printf("%s win", u.name)
-					os.Exit(0)
+					fmt.Printf("\n%s win\n", u.name)
+					var winmsg = new(bytes.Buffer)
+					if(u.name == mannedname){
+						fmt.Fprintf(winmsg,"<br><h1,style=\"color:orange\">#1,<span,style=\"color:gray\">/%d</span></h1><h1,style=\"color:red\">%s,win!!<br>勝った!勝った!夕飯はドン勝だ!!</h1>", maxPlayers,mannedname)
+						fmt.Fprintf(winmsg,"<br><h2>ランク,#1　　キル,%d,プレイヤー　　報酬　単位</h1>",killnum)
+						view.Broadcast([]byte("8 " + winmsg.String()))
+						}else{
+						//fmt.Fprintf(winmsg,"<br><h1>#,%d<br>%s,win</h1><h1,style=\"color:blue\">まあ、こんな日もあるのさ!次はもう少しツイてますように!</h1>", rank,u.name)
+						time.Sleep(5 * time.Millisecond)
+						fmt.Fprintf(winmsg,"<h1>%s,win</h1>",u.name)
+						view.Broadcast([]byte("6 "+ winmsg.String()))
+					}
+					continueflag = false
 				}
 			}
 		}
 		sendMsg()
+
 	}
 
 	go func() {
