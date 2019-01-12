@@ -140,7 +140,6 @@ class Ameba(Cell):
 
     distination = self.route[self.routeNum]
     direct = self.cal_vector(distination[0], distination[1])
-    '''
     #--------dbug-------------------
     if self.printcnt > -1:
       print("\u001B[0K",end="")      
@@ -165,13 +164,14 @@ class Ameba(Cell):
       self.preY = self.y
       print("\u001B[0K",end="")
       print("---------------------------------")
-      print("\u001B[11A",end="")
+      print(" ")
+      print("\u001B[12A",end="")
 
       self.printcnt = 0
     else:
       self.printcnt += 1
     #-------------------------------------------
-    '''
+    
 
     return direct
     #return 0,0
